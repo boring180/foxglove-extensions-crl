@@ -11,14 +11,14 @@ This makes odometry topics usable in Foxglove panels that support pose schemas a
 
 Use the committed artifact:
 
-- `odom-converter/releases/local.odom-converter-0.5.0.foxe`
+- `odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe`
 
 Install in Foxglove (Desktop or Web):
 
 1. Click your **user icon** (top right).
 2. Open **Extensions**.
 3. Click **Install Local Extension...**.
-4. Select `local.odom-converter-0.5.0.foxe`.
+4. Select `hulchvse.odom-converter-0.5.0.foxe`.
 
 The extension is available immediately after installation.
 
@@ -77,7 +77,7 @@ Keep this extension in:
 
 Keep the prebuilt distributable artifact in:
 
-- `foxglove_extensions/odom-converter/releases/local.odom-converter-0.5.0.foxe`
+- `foxglove_extensions/odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe`
 
 ## Build from source (optional, for development)
 
@@ -94,7 +94,7 @@ Keep the prebuilt distributable artifact in:
 
 Installed extension location on Ubuntu:
 
-- `~/.foxglove-studio/extensions/local.odom-converter-0.5.0/`
+- `~/.foxglove-studio/extensions/hulchvse.odom-converter-0.5.0/`
 
 ## Can this work without installing npm?
 
@@ -104,7 +104,7 @@ Yes. This repository already includes a prebuilt `.foxe` file, which is the pref
 
 Use the committed artifact from this repo:
 
-- `odom-converter/releases/local.odom-converter-0.5.0.foxe`
+- `odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe`
 
 In Foxglove (Desktop or Web), install it through:
 
