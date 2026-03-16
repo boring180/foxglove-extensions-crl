@@ -7,6 +7,31 @@ Foxglove extension that converts:
 
 This makes odometry topics usable in Foxglove panels that support pose schemas and also adds a time-limited breadcrumb trail in the 3D panel.
 
+## Screenshots
+
+### Main showcase
+
+<img src="https://github.com/user-attachments/assets/575081f3-f386-4536-8f98-9cca0cb8882b" alt="Arrow-style trajectory" width="780" />
+
+**Arrow-style trajectory**
+
+### Configuration and axes mode
+
+<table>
+   <tr>
+      <th>Arrow-style config</th>
+      <th>Axes-like config</th>
+      <th>Axes-like trajectory</th>
+   </tr>
+   <tr>
+      <td><img src="https://github.com/user-attachments/assets/6f4ce41b-dcbd-4032-b5ed-a622b49ee1bb" alt="Config for arrow-style trajectory" width="340" /></td>
+      <td><img src="https://github.com/user-attachments/assets/1fb188ca-7057-4b95-b24c-7ac492db6700" alt="Config for axes-like trajectory" width="340" /></td>
+      <td><img src="https://github.com/user-attachments/assets/0e732eea-c401-4e85-969f-98ed20baaa30" alt="Axes-like trajectory" width="340" /></td>
+   </tr>
+</table>
+
+This sequence shows the two panel configurations and the resulting axes-like trail view.
+
 ## Primary usage (recommended): install prebuilt `.foxe`
 
 Use the committed artifact:
