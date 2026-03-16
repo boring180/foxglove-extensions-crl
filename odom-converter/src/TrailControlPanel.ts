@@ -1,217 +1,241 @@
-import { PanelExtensionContext } from "@foxglove/extension";
+import { PanelExtensionContext, Topic } from "@foxglove/extension";
 
-import { normalizeTrailConfig, setTrailConfig } from "./trailRuntimeConfig";
+import {
+  getAllTrailConfigs,
+  getTrailConfigForTopic,
+  replaceAllTrailConfigs,
+  setTrailConfigForTopic,
+  TrailRuntimeConfig,
+} from "./trailRuntimeConfig";
 
-type TrailPanelState = {
-  lifetimeSec: number;
-  axisScale: number;
-  style: "arrow" | "axes";
-  arrowColorHex: string;
-  arrowAlpha: number;
+type PanelState = {
+  topics: Record<string, TrailRuntimeConfig>;
 };
 
-type TrailPanelStateInput = {
-  lifetimeSec?: unknown;
-  axisScale?: unknown;
-  style?: unknown;
-  arrowColorHex?: unknown;
-  arrowAlpha?: unknown;
-};
-
-const VAR_LIFETIME = "odomTrailLifetimeSec";
-const VAR_AXIS_SCALE = "odomTrailAxisScale";
-const VAR_STYLE = "odomTrailStyle";
-const VAR_ARROW_COLOR = "odomTrailArrowColor";
-const VAR_ARROW_ALPHA = "odomTrailArrowAlpha";
-
-function normalizeState(state: TrailPanelStateInput | undefined): TrailPanelState {
-  return normalizeTrailConfig(state);
+function createLabel(text: string): HTMLLabelElement {
+  const label = document.createElement("label");
+  label.textContent = text;
+  label.style.display = "flex";
+  label.style.flexDirection = "column";
+  label.style.gap = "6px";
+  label.style.fontSize = "12px";
+  return label;
 }
 
-function setSharedVariables(context: PanelExtensionContext, state: TrailPanelState): void {
-  context.setVariable(VAR_LIFETIME, state.lifetimeSec);
-  context.setVariable(VAR_AXIS_SCALE, state.axisScale);
-  context.setVariable(VAR_STYLE, state.style);
-  context.setVariable(VAR_ARROW_COLOR, state.arrowColorHex);
-  context.setVariable(VAR_ARROW_ALPHA, state.arrowAlpha);
+function createNumberInput(min: string, max: string, step: string): HTMLInputElement {
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = min;
+  input.max = max;
+  input.step = step;
+  input.style.width = "100%";
+  return input;
+}
+
+function initTopicRow(args: {
+  topicName: string;
+  config: TrailRuntimeConfig;
+  onChange: (topicName: string, partial: Partial<TrailRuntimeConfig>) => void;
+}): HTMLDivElement {
+  const { topicName, config, onChange } = args;
+
+  const card = document.createElement("div");
+  card.style.border = "1px solid rgba(127,127,127,0.25)";
+  card.style.borderRadius = "8px";
+  card.style.padding = "12px";
+  card.style.display = "grid";
+  card.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+  card.style.gap = "10px";
+  card.style.background = "rgba(127,127,127,0.05)";
+
+  const header = document.createElement("div");
+  header.style.gridColumn = "1 / -1";
+  header.style.display = "flex";
+  header.style.alignItems = "center";
+  header.style.justifyContent = "space-between";
+  header.style.gap = "12px";
+
+  const title = document.createElement("div");
+  title.textContent = topicName;
+  title.style.fontWeight = "600";
+  title.style.fontSize = "13px";
+  title.style.wordBreak = "break-all";
+
+  const badge = document.createElement("div");
+  badge.textContent = "odom";
+  badge.style.padding = "2px 8px";
+  badge.style.borderRadius = "999px";
+  badge.style.fontSize = "11px";
+  badge.style.background = "rgba(25, 179, 255, 0.15)";
+  badge.style.color = "#1998d6";
+
+  header.appendChild(title);
+  header.appendChild(badge);
+
+  const lifetimeLabel = createLabel("Trail lifetime (s)");
+  const lifetimeInput = createNumberInput("0.1", "120", "0.1");
+  lifetimeInput.value = config.lifetimeSec.toString();
+  lifetimeLabel.appendChild(lifetimeInput);
+
+  const scaleLabel = createLabel("Trail scale");
+  const scaleInput = createNumberInput("0.05", "10", "0.05");
+  scaleInput.value = config.axisScale.toString();
+  scaleLabel.appendChild(scaleInput);
+
+  const styleLabel = createLabel("Style");
+  const styleSelect = document.createElement("select");
+  styleSelect.style.width = "100%";
+  for (const value of ["arrow", "axes"] as const) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value === "arrow" ? "Arrow" : "Axes";
+    styleSelect.appendChild(option);
+  }
+  styleSelect.value = config.style;
+  styleLabel.appendChild(styleSelect);
+
+  const colorLabel = createLabel("Arrow color");
+  const colorInput = document.createElement("input");
+  colorInput.type = "color";
+  colorInput.value = config.arrowColorHex;
+  colorInput.style.width = "100%";
+  colorLabel.appendChild(colorInput);
+
+  const opacityLabel = createLabel("Arrow opacity");
+  const opacityInput = createNumberInput("0", "1", "0.05");
+  opacityInput.value = config.arrowAlpha.toString();
+  opacityLabel.appendChild(opacityInput);
+
+  const footer = document.createElement("div");
+  footer.style.gridColumn = "1 / -1";
+  footer.style.fontSize = "11px";
+  footer.style.opacity = "0.7";
+
+  const refreshArrowControls = (): void => {
+    const arrowMode = styleSelect.value === "arrow";
+    colorInput.disabled = !arrowMode;
+    opacityInput.disabled = !arrowMode;
+    colorLabel.style.opacity = arrowMode ? "1" : "0.45";
+    opacityLabel.style.opacity = arrowMode ? "1" : "0.45";
+    footer.textContent =
+      styleSelect.value === "axes"
+        ? "Axes style uses fixed RGB axis colors."
+        : "Arrow style uses the selected color and opacity.";
+  };
+
+  const emitChange = (): void => {
+    onChange(topicName, {
+      lifetimeSec: Number(lifetimeInput.value),
+      axisScale: Number(scaleInput.value),
+      style: styleSelect.value as TrailRuntimeConfig["style"],
+      arrowColorHex: colorInput.value,
+      arrowAlpha: Number(opacityInput.value),
+    });
+    refreshArrowControls();
+  };
+
+  lifetimeInput.addEventListener("change", emitChange);
+  scaleInput.addEventListener("change", emitChange);
+  styleSelect.addEventListener("change", emitChange);
+  colorInput.addEventListener("change", emitChange);
+  opacityInput.addEventListener("change", emitChange);
+
+  refreshArrowControls();
+
+  card.appendChild(header);
+  card.appendChild(lifetimeLabel);
+  card.appendChild(scaleLabel);
+  card.appendChild(styleLabel);
+  card.appendChild(colorLabel);
+  card.appendChild(opacityLabel);
+  card.appendChild(footer);
+
+  return card;
 }
 
 export function initTrailControlPanel(context: PanelExtensionContext): () => void {
   const root = document.createElement("div");
+  root.style.height = "100%";
+  root.style.overflow = "auto";
   root.style.display = "flex";
   root.style.flexDirection = "column";
   root.style.gap = "12px";
   root.style.padding = "12px";
+  root.style.boxSizing = "border-box";
   root.style.fontFamily = "system-ui, sans-serif";
 
   const title = document.createElement("h2");
-  title.textContent = "Odometry trail controls";
+  title.textContent = "🧭 Odometry Trail Settings";
   title.style.margin = "0";
-  title.style.fontSize = "14px";
+  title.style.fontSize = "15px";
 
   const help = document.createElement("div");
-  help.textContent = "Adjust lifetime, style, and color for nav_msgs/msg/Odometry -> foxglove.SceneUpdate trail.";
+  help.textContent =
+    "Configure each nav_msgs/msg/Odometry topic independently. Changes affect the SceneUpdate trail live.";
   help.style.fontSize = "12px";
   help.style.opacity = "0.85";
 
-  const lifetimeLabel = document.createElement("label");
-  lifetimeLabel.textContent = "Trail lifetime (seconds)";
-  lifetimeLabel.style.display = "flex";
-  lifetimeLabel.style.flexDirection = "column";
-  lifetimeLabel.style.gap = "6px";
-
-  const lifetimeInput = document.createElement("input");
-  lifetimeInput.type = "number";
-  lifetimeInput.min = "0.1";
-  lifetimeInput.max = "120";
-  lifetimeInput.step = "0.1";
-
-  const scaleLabel = document.createElement("label");
-  scaleLabel.textContent = "Trail axis scale";
-  scaleLabel.style.display = "flex";
-  scaleLabel.style.flexDirection = "column";
-  scaleLabel.style.gap = "6px";
-
-  const scaleInput = document.createElement("input");
-  scaleInput.type = "number";
-  scaleInput.min = "0.05";
-  scaleInput.max = "10";
-  scaleInput.step = "0.05";
-
-  const styleLabel = document.createElement("label");
-  styleLabel.textContent = "Trail style";
-  styleLabel.style.display = "flex";
-  styleLabel.style.flexDirection = "column";
-  styleLabel.style.gap = "6px";
-
-  const styleSelect = document.createElement("select");
-  const arrowOption = document.createElement("option");
-  arrowOption.value = "arrow";
-  arrowOption.textContent = "Arrow";
-  const axesOption = document.createElement("option");
-  axesOption.value = "axes";
-  axesOption.textContent = "Axes";
-  styleSelect.appendChild(arrowOption);
-  styleSelect.appendChild(axesOption);
-
-  const colorLabel = document.createElement("label");
-  colorLabel.textContent = "Arrow color";
-  colorLabel.style.display = "flex";
-  colorLabel.style.flexDirection = "column";
-  colorLabel.style.gap = "6px";
-
-  const colorInput = document.createElement("input");
-  colorInput.type = "color";
-
-  const alphaLabel = document.createElement("label");
-  alphaLabel.textContent = "Arrow opacity (0..1)";
-  alphaLabel.style.display = "flex";
-  alphaLabel.style.flexDirection = "column";
-  alphaLabel.style.gap = "6px";
-
-  const alphaInput = document.createElement("input");
-  alphaInput.type = "number";
-  alphaInput.min = "0";
-  alphaInput.max = "1";
-  alphaInput.step = "0.05";
-
-  const status = document.createElement("div");
-  status.style.fontSize = "12px";
-  status.style.opacity = "0.8";
-
-  lifetimeLabel.appendChild(lifetimeInput);
-  scaleLabel.appendChild(scaleInput);
-  styleLabel.appendChild(styleSelect);
-  colorLabel.appendChild(colorInput);
-  alphaLabel.appendChild(alphaInput);
+  const topicList = document.createElement("div");
+  topicList.style.display = "flex";
+  topicList.style.flexDirection = "column";
+  topicList.style.gap = "12px";
 
   root.appendChild(title);
   root.appendChild(help);
-  root.appendChild(lifetimeLabel);
-  root.appendChild(scaleLabel);
-  root.appendChild(styleLabel);
-  root.appendChild(colorLabel);
-  root.appendChild(alphaLabel);
-  root.appendChild(status);
+  root.appendChild(topicList);
   context.panelElement.appendChild(root);
 
-  let panelState = normalizeState(context.initialState as TrailPanelStateInput | undefined);
+  const initialState = (context.initialState as Partial<PanelState> | undefined)?.topics;
+  replaceAllTrailConfigs(initialState);
 
-  function render(state: TrailPanelState): void {
-    lifetimeInput.value = state.lifetimeSec.toString();
-    scaleInput.value = state.axisScale.toString();
-    styleSelect.value = state.style;
-    colorInput.value = state.arrowColorHex;
-    alphaInput.value = state.arrowAlpha.toString();
+  let currentTopics: readonly Topic[] = [];
 
-    const arrowStyle = state.style === "arrow";
-    colorInput.disabled = !arrowStyle;
-    alphaInput.disabled = !arrowStyle;
-    colorLabel.style.opacity = arrowStyle ? "1" : "0.5";
-    alphaLabel.style.opacity = arrowStyle ? "1" : "0.5";
+  const persistState = (): void => {
+    context.saveState({ topics: getAllTrailConfigs() });
+  };
 
-    status.textContent = `Current: style=${state.style}, lifetime=${state.lifetimeSec.toFixed(1)}s, scale=${state.axisScale.toFixed(2)}`;
-  }
+  const handleTopicChange = (topicName: string, partial: Partial<TrailRuntimeConfig>): void => {
+    setTrailConfigForTopic(topicName, partial);
+    persistState();
+  };
 
-  function updateFromInputs(): void {
-    panelState = normalizeState({
-      lifetimeSec: lifetimeInput.value,
-      axisScale: scaleInput.value,
-      style: styleSelect.value,
-      arrowColorHex: colorInput.value,
-      arrowAlpha: alphaInput.value,
-    });
+  const renderTopics = (): void => {
+    topicList.replaceChildren();
 
-    render(panelState);
-    context.saveState(panelState);
-    setTrailConfig(panelState);
-    setSharedVariables(context, panelState);
-  }
+    const odomTopics = currentTopics.filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry");
 
-  lifetimeInput.addEventListener("change", updateFromInputs);
-  scaleInput.addEventListener("change", updateFromInputs);
-  styleSelect.addEventListener("change", updateFromInputs);
-  colorInput.addEventListener("change", updateFromInputs);
-  alphaInput.addEventListener("change", updateFromInputs);
-
-  render(panelState);
-  context.saveState(panelState);
-  setTrailConfig(panelState);
-  setSharedVariables(context, panelState);
-
-  context.onRender = (renderState, done: () => void) => {
-    const nextState = normalizeState({
-      lifetimeSec: renderState.variables?.get(VAR_LIFETIME),
-      axisScale: renderState.variables?.get(VAR_AXIS_SCALE),
-      style: renderState.variables?.get(VAR_STYLE),
-      arrowColorHex: renderState.variables?.get(VAR_ARROW_COLOR),
-      arrowAlpha: renderState.variables?.get(VAR_ARROW_ALPHA),
-    });
-
-    if (
-      nextState.lifetimeSec !== panelState.lifetimeSec ||
-      nextState.axisScale !== panelState.axisScale ||
-      nextState.style !== panelState.style ||
-      nextState.arrowColorHex !== panelState.arrowColorHex ||
-      nextState.arrowAlpha !== panelState.arrowAlpha
-    ) {
-      panelState = nextState;
-      render(panelState);
-      context.saveState(panelState);
-      setTrailConfig(panelState);
+    if (odomTopics.length === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "No nav_msgs/msg/Odometry topics detected in the current data source.";
+      empty.style.fontSize = "12px";
+      empty.style.opacity = "0.75";
+      topicList.appendChild(empty);
+      return;
     }
 
+    for (const topic of odomTopics) {
+      const config = getTrailConfigForTopic(topic.name);
+      topicList.appendChild(
+        initTopicRow({
+          topicName: topic.name,
+          config,
+          onChange: handleTopicChange,
+        }),
+      );
+    }
+  };
+
+  context.onRender = (renderState, done) => {
+    currentTopics = renderState.topics ?? [];
+    renderTopics();
     done();
   };
 
-  context.watch("variables");
+  context.watch("topics");
+  persistState();
+  renderTopics();
 
   return () => {
-    lifetimeInput.removeEventListener("change", updateFromInputs);
-    scaleInput.removeEventListener("change", updateFromInputs);
-    styleSelect.removeEventListener("change", updateFromInputs);
-    colorInput.removeEventListener("change", updateFromInputs);
-    alphaInput.removeEventListener("change", updateFromInputs);
     root.remove();
   };
 }

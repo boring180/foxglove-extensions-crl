@@ -8,7 +8,7 @@ This repository is intended to host multiple extensions over time.
 
 - [Odometry Converter](odom-converter/README.md)
   - Converts `nav_msgs/msg/Odometry` to `geometry_msgs/msg/PoseStamped`
-  - Prebuilt package: [odom-converter/releases/local.odom-converter-0.4.0.foxe](odom-converter/releases/local.odom-converter-0.4.0.foxe)
+  - Prebuilt package: [odom-converter/releases/local.odom-converter-0.5.0.foxe](odom-converter/releases/local.odom-converter-0.5.0.foxe)
 
 ## Repository structure
 

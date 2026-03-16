@@ -3,7 +3,7 @@
   "displayName": "Odometry to Pose Converter",
   "description": "Foxglove message converters for nav_msgs/msg/Odometry to PoseStamped and SceneUpdate trail visualization.",
   "publisher": "local",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "license": "MIT",
   "main": "./dist/extension.js",
   "scripts": {

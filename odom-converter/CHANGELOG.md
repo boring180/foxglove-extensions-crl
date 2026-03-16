@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Replaced the global trail control panel with a per-topic settings panel.
+- Added independent lifetime, scale, style, and arrow color/opacity controls for each odometry topic.
+- Renamed the panel to `🧭 Odometry Trail Settings` for better discoverability.
+
 ## 0.4.0
 
 - Added trail style control: `Arrow` or `Axes`.

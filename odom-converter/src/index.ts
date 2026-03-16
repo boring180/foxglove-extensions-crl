@@ -1,7 +1,7 @@
-import { ExtensionContext } from "@foxglove/extension";
+import { ExtensionContext, Immutable, MessageEvent } from "@foxglove/extension";
 
 import { initTrailControlPanel } from "./TrailControlPanel";
-import { getTrailConfig } from "./trailRuntimeConfig";
+import { getTrailConfigForTopic } from "./trailRuntimeConfig";
 
 type Quaternion = { x: number; y: number; z: number; w: number };
 
@@ -127,7 +127,7 @@ function makeAxesArrows(msg: Odometry, axisScale: number) {
 
 export function activate(extensionContext: ExtensionContext): void {
   extensionContext.registerPanel({
-    name: "Odometry trail controls",
+    name: "🧭 Odometry Trail Settings",
     initPanel: initTrailControlPanel,
   });
 
@@ -147,8 +147,9 @@ export function activate(extensionContext: ExtensionContext): void {
     type: "schema",
     fromSchemaName: "nav_msgs/msg/Odometry",
     toSchemaName: "foxglove.SceneUpdate",
-    converter: (msg: Odometry) => {
-      const { lifetimeSec, axisScale, style, arrowColorHex, arrowAlpha } = getTrailConfig();
+    converter: (msg: Odometry, event: Immutable<MessageEvent<Odometry>>) => {
+      const { lifetimeSec, axisScale, style, arrowColorHex, arrowAlpha } =
+        getTrailConfigForTopic(event.topic);
 
       return {
         deletions: [],

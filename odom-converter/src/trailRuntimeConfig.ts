@@ -6,6 +6,8 @@ export type TrailRuntimeConfig = {
   arrowAlpha: number;
 };
 
+export type TrailRuntimeConfigMap = Record<string, TrailRuntimeConfig>;
+
 type TrailRuntimeConfigInput = {
   lifetimeSec?: unknown;
   axisScale?: unknown;
@@ -22,7 +24,58 @@ const DEFAULT_CONFIG: TrailRuntimeConfig = {
   arrowAlpha: 0.9,
 };
 
-let currentConfig: TrailRuntimeConfig = { ...DEFAULT_CONFIG };
+const STORAGE_KEY = "odom-converter.trail-configs.v1";
+
+let currentConfigs: TrailRuntimeConfigMap = {};
+let didHydrateFromStorage = false;
+
+function getStorage(): Storage | undefined {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredConfigs(configs: TrailRuntimeConfigMap): void {
+  const storage = getStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(STORAGE_KEY, JSON.stringify(configs));
+  } catch {
+  }
+}
+
+function hydrateFromStorage(): void {
+  if (didHydrateFromStorage) {
+    return;
+  }
+
+  didHydrateFromStorage = true;
+
+  const storage = getStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    const rawValue = storage.getItem(STORAGE_KEY);
+    if (!rawValue) {
+      return;
+    }
+
+    const parsed = JSON.parse(rawValue) as Record<string, TrailRuntimeConfigInput>;
+    const next: TrailRuntimeConfigMap = {};
+    for (const [topicName, config] of Object.entries(parsed ?? {})) {
+      next[topicName] = normalizeTrailConfig(config);
+    }
+    currentConfigs = next;
+  } catch {
+  }
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -64,10 +117,44 @@ export function normalizeTrailConfig(state: TrailRuntimeConfigInput | undefined)
 }
 
 export function getTrailConfig(): TrailRuntimeConfig {
-  return currentConfig;
+  return { ...DEFAULT_CONFIG };
 }
 
-export function setTrailConfig(partial: TrailRuntimeConfigInput | undefined): TrailRuntimeConfig {
-  currentConfig = normalizeTrailConfig({ ...currentConfig, ...partial });
-  return currentConfig;
+export function getTrailConfigForTopic(topicName: string): TrailRuntimeConfig {
+  hydrateFromStorage();
+  return currentConfigs[topicName] ?? { ...DEFAULT_CONFIG };
+}
+
+export function setTrailConfigForTopic(
+  topicName: string,
+  partial: TrailRuntimeConfigInput | undefined,
+): TrailRuntimeConfig {
+  hydrateFromStorage();
+  const current = getTrailConfigForTopic(topicName);
+  const next = normalizeTrailConfig({ ...current, ...partial });
+  currentConfigs = { ...currentConfigs, [topicName]: next };
+  writeStoredConfigs(currentConfigs);
+  return next;
+}
+
+export function replaceAllTrailConfigs(configs: Record<string, TrailRuntimeConfigInput> | undefined): void {
+  hydrateFromStorage();
+
+  if (configs == undefined) {
+    return;
+  }
+
+  const next: TrailRuntimeConfigMap = {};
+
+  for (const [topicName, config] of Object.entries(configs ?? {})) {
+    next[topicName] = normalizeTrailConfig(config);
+  }
+
+  currentConfigs = next;
+  writeStoredConfigs(currentConfigs);
+}
+
+export function getAllTrailConfigs(): TrailRuntimeConfigMap {
+  hydrateFromStorage();
+  return { ...currentConfigs };
 }
