@@ -103,6 +103,21 @@ export function clearTrailHistory(topicName?: string): void {
   lastProcessedEntityIdByTopic.delete(topicName);
 }
 
+const clearPendingTopics = new Set<string>();
+
+export function requestTrailClear(topicName: string): void {
+  clearTrailHistory(topicName);
+  clearPendingTopics.add(topicName);
+}
+
+export function consumeTrailClearPending(topicName: string): boolean {
+  if (clearPendingTopics.has(topicName)) {
+    clearPendingTopics.delete(topicName);
+    return true;
+  }
+  return false;
+}
+
 export function ingestOdometryMessage(
   topicName: string,
   msg: OdometryLike,

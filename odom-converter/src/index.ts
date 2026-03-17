@@ -3,6 +3,7 @@ import { ExtensionContext, Immutable, MessageEvent } from "@foxglove/extension";
 import { initTrailControlPanel } from "./TrailControlPanel";
 import { getTrailConfigForTopic, TrailRuntimeConfig } from "./trailRuntimeConfig";
 import {
+  consumeTrailClearPending,
   getTrailHistory,
   ingestOdometryMessage,
   OdometryLike,
@@ -83,7 +84,8 @@ function configsEqual(a: TrailRuntimeConfig, b: TrailRuntimeConfig): boolean {
     a.arrowColorHex === b.arrowColorHex &&
     a.arrowAlpha === b.arrowAlpha &&
     a.minPositionDelta === b.minPositionDelta &&
-    a.minRotationDeltaDeg === b.minRotationDeltaDeg
+    a.minRotationDeltaDeg === b.minRotationDeltaDeg &&
+    a.visible === b.visible
   );
 }
 
@@ -193,25 +195,36 @@ export function activate(extensionContext: ExtensionContext): void {
     toSchemaName: "foxglove.SceneUpdate",
     converter: (msg: Odometry, event: Immutable<MessageEvent<Odometry>>) => {
       const config = getTrailConfigForTopic(event.topic);
+      const hasPendingClear = consumeTrailClearPending(event.topic);
 
       const previousConfig = lastAppliedConfigByTopic.get(event.topic);
       const configChanged = previousConfig != undefined && !configsEqual(previousConfig, config);
+      const visibilityJustChanged =
+        previousConfig != undefined && previousConfig.visible !== config.visible;
       lastAppliedConfigByTopic.set(event.topic, { ...config });
 
+      const needsDeletion = configChanged || hasPendingClear;
+
+      if (!config.visible) {
+        // Hidden: keep history buffer intact, just clear the scene when needed
+        if (visibilityJustChanged || hasPendingClear) {
+          return {
+            deletions: [{ timestamp: msg.header.stamp, type: 1, id: "" }],
+            entities: [],
+          };
+        }
+        return undefined;
+      }
+
+      // Visible: ingest as normal
       ingestOdometryMessage(event.topic, msg as OdometryLike, config);
 
       const history = getTrailHistory(event.topic);
 
       if (history.length === 0) {
-        if (configChanged) {
+        if (needsDeletion) {
           return {
-            deletions: [
-              {
-                timestamp: msg.header.stamp,
-                type: 1,
-                id: "",
-              },
-            ],
+            deletions: [{ timestamp: msg.header.stamp, type: 1, id: "" }],
             entities: [],
           };
         }
@@ -221,15 +234,7 @@ export function activate(extensionContext: ExtensionContext): void {
       const entities = history.map((entry) => makeTrailEntityFromSnapshot(entry, config));
 
       return {
-        deletions: configChanged
-          ? [
-              {
-                timestamp: msg.header.stamp,
-                type: 1,
-                id: "",
-              },
-            ]
-          : [],
+        deletions: needsDeletion ? [{ timestamp: msg.header.stamp, type: 1, id: "" }] : [],
         entities,
       };
     },

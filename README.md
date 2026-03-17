@@ -18,7 +18,7 @@ This repository is intended to host multiple extensions over time.
 
 Converts `nav_msgs/msg/Odometry` to `geometry_msgs/msg/PoseStamped` and `foxglove.SceneUpdate` (breadcrumb trail).
 
-Prebuilt: [hulchvse.odom-converter-0.5.0.foxe](odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe)
+Prebuilt: [hulchvse.odom-converter-0.5.1.foxe](odom-converter/releases/hulchvse.odom-converter-0.5.1.foxe)
 
   </td>
     <td><img src="https://github.com/user-attachments/assets/9f49da04-9836-470d-9e68-a217dc7608a6" alt="Odometry trail visualization" width="360" /></td>

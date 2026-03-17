@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Added per-topic trail visibility toggle with an eye icon in the topic header.
+- Hiding a trail now clears only scene visibility (not the history buffer), so showing it restores buffered history.
+- Added `Reset to defaults` and `Clear trail` buttons to each topic card.
+- Updated default trail settings to: arrow style, red color, scale 2, 100s lifetime, 0.2m position tolerance, 5° rotation tolerance, and 0.5 opacity.
+- Removed upper clamp on trail scale.
+
 ## 0.5.0
 
 - Replaced the global trail control panel with a per-topic settings panel.

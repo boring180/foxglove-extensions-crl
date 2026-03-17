@@ -1,12 +1,13 @@
 import { PanelExtensionContext, Topic } from "@foxglove/extension";
 
 import {
+  DEFAULT_CONFIG,
   getAllTrailConfigs,
   getTrailConfigForTopic,
   setTrailConfigForTopic,
   TrailRuntimeConfig,
 } from "./trailRuntimeConfig";
-import { ingestOdometryMessage, OdometryLike } from "./trailRuntimeHistory";
+import { ingestOdometryMessage, OdometryLike, requestTrailClear } from "./trailRuntimeHistory";
 
 function createLabel(text: string): HTMLLabelElement {
   const label = document.createElement("label");
@@ -34,8 +35,9 @@ function initTopicRow(args: {
   topicName: string;
   config: TrailRuntimeConfig;
   onChange: (topicName: string, partial: Partial<TrailRuntimeConfig>) => void;
+  onClear: (topicName: string) => void;
 }): HTMLDivElement {
-  const { topicName, config, onChange } = args;
+  const { topicName, config, onChange, onClear } = args;
 
   const card = document.createElement("div");
   card.style.border = "1px solid rgba(127,127,127,0.25)";
@@ -50,8 +52,8 @@ function initTopicRow(args: {
   header.style.gridColumn = "1 / -1";
   header.style.display = "flex";
   header.style.alignItems = "center";
-  header.style.justifyContent = "space-between";
-  header.style.gap = "12px";
+  header.style.justifyContent = "flex-start";
+  header.style.gap = "8px";
 
   const title = document.createElement("div");
   title.textContent = topicName;
@@ -66,7 +68,41 @@ function initTopicRow(args: {
   badge.style.fontSize = "11px";
   badge.style.background = "rgba(25, 179, 255, 0.15)";
   badge.style.color = "#1998d6";
+  badge.style.marginLeft = "auto";
 
+  // Eye icon button — acts as visibility toggle
+  let isVisible = config.visible;
+  const eyeBtn = document.createElement("button");
+  eyeBtn.title = "Toggle trail visibility";
+  eyeBtn.style.background = "none";
+  eyeBtn.style.border = "none";
+  eyeBtn.style.cursor = "pointer";
+  eyeBtn.style.padding = "2px 4px";
+  eyeBtn.style.lineHeight = "1";
+  eyeBtn.style.opacity = "0.85";
+  eyeBtn.style.display = "flex";
+  eyeBtn.style.alignItems = "center";
+
+  const SVG_EYE_OPEN =
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>` +
+    `<circle cx="12" cy="12" r="3"/>` +
+    `</svg>`;
+  const SVG_EYE_CLOSED =
+    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>` +
+    `<path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>` +
+    `<path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/>` +
+    `<line x1="1" y1="1" x2="23" y2="23"/>` +
+    `</svg>`;
+
+  const updateEye = (visible: boolean): void => {
+    eyeBtn.innerHTML = visible ? SVG_EYE_OPEN : SVG_EYE_CLOSED;
+    eyeBtn.title = visible ? "Hide trail" : "Show trail";
+  };
+  updateEye(isVisible);
+
+  header.appendChild(eyeBtn);
   header.appendChild(title);
   header.appendChild(badge);
 
@@ -119,10 +155,22 @@ function initTopicRow(args: {
   footer.style.fontSize = "11px";
   footer.style.opacity = "0.7";
 
+  const settingsNodes = [lifetimeLabel, scaleLabel, styleLabel, colorLabel, opacityLabel, posTolLabel, rotTolLabel];
+
+  const refreshVisibility = (visible: boolean): void => {
+    card.style.opacity = visible ? "1" : "0.5";
+    for (const node of settingsNodes) {
+      const inputs = Array.from(node.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select"));
+      for (const el of inputs) {
+        el.disabled = !visible;
+      }
+    }
+  };
+
   const refreshArrowControls = (): void => {
     const arrowMode = styleSelect.value === "arrow";
-    colorInput.disabled = !arrowMode;
-    opacityInput.disabled = !arrowMode;
+    colorInput.disabled = !arrowMode || !isVisible;
+    opacityInput.disabled = !arrowMode || !isVisible;
     colorLabel.style.opacity = arrowMode ? "1" : "0.45";
     opacityLabel.style.opacity = arrowMode ? "1" : "0.45";
     footer.textContent =
@@ -152,7 +200,60 @@ function initTopicRow(args: {
   posTolInput.addEventListener("change", emitChange);
   rotTolInput.addEventListener("change", emitChange);
 
+  const refreshInputs = (cfg: TrailRuntimeConfig): void => {
+    lifetimeInput.value = cfg.lifetimeSec.toString();
+    scaleInput.value = cfg.axisScale.toString();
+    styleSelect.value = cfg.style;
+    colorInput.value = cfg.arrowColorHex;
+    opacityInput.value = cfg.arrowAlpha.toString();
+    posTolInput.value = cfg.minPositionDelta.toString();
+    rotTolInput.value = cfg.minRotationDeltaDeg.toString();
+    isVisible = cfg.visible;
+    updateEye(isVisible);
+    refreshVisibility(isVisible);
+  };
+
+  eyeBtn.addEventListener("click", () => {
+    isVisible = !isVisible;
+    updateEye(isVisible);
+    refreshVisibility(isVisible);
+    refreshArrowControls();
+    onChange(topicName, { visible: isVisible });
+  });
+
+  // Initial state
+  refreshVisibility(isVisible);
   refreshArrowControls();
+
+  const buttonRow = document.createElement("div");
+  buttonRow.style.gridColumn = "1 / -1";
+  buttonRow.style.display = "flex";
+  buttonRow.style.gap = "8px";
+
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "Reset to defaults";
+  resetBtn.style.flex = "1";
+  resetBtn.style.fontSize = "11px";
+  resetBtn.style.padding = "4px 8px";
+  resetBtn.style.cursor = "pointer";
+  resetBtn.addEventListener("click", () => {
+    onChange(topicName, { ...DEFAULT_CONFIG });
+    refreshInputs(DEFAULT_CONFIG);
+    refreshArrowControls();
+  });
+
+  const clearBtn = document.createElement("button");
+  clearBtn.textContent = "Clear trail";
+  clearBtn.style.flex = "1";
+  clearBtn.style.fontSize = "11px";
+  clearBtn.style.padding = "4px 8px";
+  clearBtn.style.cursor = "pointer";
+  clearBtn.addEventListener("click", () => {
+    onClear(topicName);
+  });
+
+  buttonRow.appendChild(resetBtn);
+  buttonRow.appendChild(clearBtn);
 
   card.appendChild(header);
   card.appendChild(lifetimeLabel);
@@ -163,6 +264,7 @@ function initTopicRow(args: {
   card.appendChild(posTolLabel);
   card.appendChild(rotTolLabel);
   card.appendChild(footer);
+  card.appendChild(buttonRow);
 
   return card;
 }
@@ -212,6 +314,10 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
     persistState();
   };
 
+  const handleTopicClear = (topicName: string): void => {
+    requestTrailClear(topicName);
+  };
+
   const renderTopics = (): void => {
     topicList.replaceChildren();
 
@@ -233,6 +339,7 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
           topicName: topic.name,
           config,
           onChange: handleTopicChange,
+          onClear: handleTopicClear,
         }),
       );
     }

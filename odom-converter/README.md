@@ -36,14 +36,14 @@ This sequence shows the two panel configurations and the resulting axes-like tra
 
 Use the committed artifact:
 
-- `odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe`
+- `odom-converter/releases/hulchvse.odom-converter-0.5.1.foxe`
 
 Install in Foxglove (Desktop or Web):
 
 1. Click your **user icon** (top right).
 2. Open **Extensions**.
 3. Click **Install Local Extension...**.
-4. Select `hulchvse.odom-converter-0.5.0.foxe`.
+4. Select `hulchvse.odom-converter-0.5.1.foxe`.
 
 The extension is available immediately after installation.
 
@@ -102,7 +102,7 @@ Keep this extension in:
 
 Keep the prebuilt distributable artifact in:
 
-- `foxglove_extensions/odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe`
+- `foxglove_extensions/odom-converter/releases/hulchvse.odom-converter-0.5.1.foxe`
 
 ## Build from source (optional, for development)
 
@@ -119,7 +119,7 @@ Keep the prebuilt distributable artifact in:
 
 Installed extension location on Ubuntu:
 
-- `~/.foxglove-studio/extensions/hulchvse.odom-converter-0.5.0/`
+- `~/.foxglove-studio/extensions/hulchvse.odom-converter-0.5.1/`
 
 ## Can this work without installing npm?
 
@@ -129,7 +129,7 @@ Yes. This repository already includes a prebuilt `.foxe` file, which is the pref
 
 Use the committed artifact from this repo:
 
-- `odom-converter/releases/hulchvse.odom-converter-0.5.0.foxe`
+- `odom-converter/releases/hulchvse.odom-converter-0.5.1.foxe`
 
 In Foxglove (Desktop or Web), install it through:
 
