@@ -177,6 +177,7 @@ export function activate(extensionContext: ExtensionContext): void {
     initPanel: initTrailControlPanel,
   });
 
+  // ROS2 schema
   extensionContext.registerMessageConverter({
     type: "schema",
     fromSchemaName: "nav_msgs/msg/Odometry",
@@ -189,54 +190,78 @@ export function activate(extensionContext: ExtensionContext): void {
     },
   });
 
+  // ROS1 schema
+  extensionContext.registerMessageConverter({
+    type: "schema",
+    fromSchemaName: "nav_msgs/Odometry",
+    toSchemaName: "geometry_msgs/PoseStamped",
+    converter: (msg: Odometry) => {
+      return {
+        header: msg.header,
+        pose: msg.pose.pose,
+      };
+    },
+  });
+
+  const sceneUpdateConverter = (msg: Odometry, event: Immutable<MessageEvent<Odometry>>) => {
+    const config = getTrailConfigForTopic(event.topic);
+    const hasPendingClear = consumeTrailClearPending(event.topic);
+
+    const previousConfig = lastAppliedConfigByTopic.get(event.topic);
+    const configChanged = previousConfig != undefined && !configsEqual(previousConfig, config);
+    const visibilityJustChanged =
+      previousConfig != undefined && previousConfig.visible !== config.visible;
+    lastAppliedConfigByTopic.set(event.topic, { ...config });
+
+    const needsDeletion = configChanged || hasPendingClear;
+
+    if (!config.visible) {
+      // Hidden: keep history buffer intact, just clear the scene when needed
+      if (visibilityJustChanged || hasPendingClear) {
+        return {
+          deletions: [{ timestamp: msg.header.stamp, type: 1, id: "" }],
+          entities: [],
+        };
+      }
+      return undefined;
+    }
+
+    // Visible: ingest as normal
+    ingestOdometryMessage(event.topic, msg as OdometryLike, config);
+
+    const history = getTrailHistory(event.topic);
+
+    if (history.length === 0) {
+      if (needsDeletion) {
+        return {
+          deletions: [{ timestamp: msg.header.stamp, type: 1, id: "" }],
+          entities: [],
+        };
+      }
+      return undefined;
+    }
+
+    const entities = history.map((entry) => makeTrailEntityFromSnapshot(entry, config));
+
+    return {
+      deletions: needsDeletion ? [{ timestamp: msg.header.stamp, type: 1, id: "" }] : [],
+      entities,
+    };
+  };
+
+  // ROS2 schema
   extensionContext.registerMessageConverter({
     type: "schema",
     fromSchemaName: "nav_msgs/msg/Odometry",
     toSchemaName: "foxglove.SceneUpdate",
-    converter: (msg: Odometry, event: Immutable<MessageEvent<Odometry>>) => {
-      const config = getTrailConfigForTopic(event.topic);
-      const hasPendingClear = consumeTrailClearPending(event.topic);
+    converter: sceneUpdateConverter,
+  });
 
-      const previousConfig = lastAppliedConfigByTopic.get(event.topic);
-      const configChanged = previousConfig != undefined && !configsEqual(previousConfig, config);
-      const visibilityJustChanged =
-        previousConfig != undefined && previousConfig.visible !== config.visible;
-      lastAppliedConfigByTopic.set(event.topic, { ...config });
-
-      const needsDeletion = configChanged || hasPendingClear;
-
-      if (!config.visible) {
-        // Hidden: keep history buffer intact, just clear the scene when needed
-        if (visibilityJustChanged || hasPendingClear) {
-          return {
-            deletions: [{ timestamp: msg.header.stamp, type: 1, id: "" }],
-            entities: [],
-          };
-        }
-        return undefined;
-      }
-
-      // Visible: ingest as normal
-      ingestOdometryMessage(event.topic, msg as OdometryLike, config);
-
-      const history = getTrailHistory(event.topic);
-
-      if (history.length === 0) {
-        if (needsDeletion) {
-          return {
-            deletions: [{ timestamp: msg.header.stamp, type: 1, id: "" }],
-            entities: [],
-          };
-        }
-        return undefined;
-      }
-
-      const entities = history.map((entry) => makeTrailEntityFromSnapshot(entry, config));
-
-      return {
-        deletions: needsDeletion ? [{ timestamp: msg.header.stamp, type: 1, id: "" }] : [],
-        entities,
-      };
-    },
+  // ROS1 schema
+  extensionContext.registerMessageConverter({
+    type: "schema",
+    fromSchemaName: "nav_msgs/Odometry",
+    toSchemaName: "foxglove.SceneUpdate",
+    converter: sceneUpdateConverter,
   });
 }
