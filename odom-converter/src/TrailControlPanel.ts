@@ -287,7 +287,7 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
 
   const help = document.createElement("div");
   help.textContent =
-    "Configure each nav_msgs/msg/Odometry topic independently. Changes affect the SceneUpdate trail live.";
+    "Configure each nav_msgs Odometry topic independently. Changes affect the SceneUpdate trail live.";
   help.style.fontSize = "12px";
   help.style.opacity = "0.85";
 
@@ -321,11 +321,11 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
   const renderTopics = (): void => {
     topicList.replaceChildren();
 
-    const odomTopics = currentTopics.filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry");
+    const odomTopics = currentTopics.filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry" || topic.schemaName === "nav_msgs/Odometry");
 
     if (odomTopics.length === 0) {
       const empty = document.createElement("div");
-      empty.textContent = "No nav_msgs/msg/Odometry topics detected in the current data source.";
+      empty.textContent = "No nav_msgs Odometry topics detected in the current data source.";
       empty.style.fontSize = "12px";
       empty.style.opacity = "0.75";
       topicList.appendChild(empty);
@@ -348,7 +348,7 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
   const updateSubscriptions = (): void => {
     odomTopicNames = new Set(
       currentTopics
-        .filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry")
+        .filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry" || topic.schemaName === "nav_msgs/Odometry")
         .map((topic) => topic.name),
     );
 
@@ -357,7 +357,7 @@ export function initTrailControlPanel(context: PanelExtensionContext): () => voi
 
   const makeOdomTopicsKey = (topics: readonly Topic[]): string => {
     return topics
-      .filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry")
+      .filter((topic) => topic.schemaName === "nav_msgs/msg/Odometry" || topic.schemaName === "nav_msgs/Odometry")
       .map((topic) => topic.name)
       .sort()
       .join("\n");
